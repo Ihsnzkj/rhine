@@ -1,0 +1,61 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Build and unit-test rhine-lock on several distributions, each with the
+# package list from the README.  (The end-to-end lock tests need a GPU
+# compositor and run locally: see AGENTS.md.)
+name: build
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.distro }}
+    runs-on: ubuntu-latest
+    container: ${{ matrix.image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: Fedora 43
+            image: registry.fedoraproject.org/fedora:43
+            deps: >-
+              dnf -y install git 'pkgconfig(gtk4)' 'pkgconfig(gtk4-layer-shell-0)'
+              'pkgconfig(webkitgtk-6.0)' pam-devel cargo clippy nodejs npm dbus-daemon
+          - distro: openSUSE Tumbleweed
+            image: opensuse/tumbleweed
+            deps: >-
+              zypper -n install git tar gzip 'pkgconfig(gtk4)' 'pkgconfig(gtk4-layer-shell-0)'
+              'pkgconfig(webkitgtk-6.0)' pam-devel cargo nodejs npm
+          - distro: Ubuntu 26.04
+            image: ubuntu:26.04
+            deps: >-
+              apt-get update &&
+              DEBIAN_FRONTEND=noninteractive apt-get install -y git curl ca-certificates
+              build-essential libgtk-4-dev libgtk4-layer-shell-dev libwebkitgtk-6.0-dev
+              libpam0g-dev pkg-config nodejs npm &&
+              curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal -c clippy &&
+              echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+    steps:
+      - name: Dependencies (README list)
+        run: ${{ matrix.deps }}
+      - uses: actions/checkout@v5
+      - name: Versions
+        run: |
+          for m in gtk4 gtk4-layer-shell-0 webkitgtk-6.0; do echo "$m $(pkg-config --modversion $m)"; done
+          rustc --version; node --version
+      - name: Frontend
+        working-directory: frontend
+        run: npm ci && npm run check && npm run build
+      - name: Backend build
+        run: cargo build --manifest-path backend/Cargo.toml --release --locked
+      - name: Backend tests
+        run: cargo test --manifest-path backend/Cargo.toml --locked --all-features
+      - name: Clippy
+        if: matrix.distro != 'openSUSE Tumbleweed'
+        run: cargo clippy --manifest-path backend/Cargo.toml --locked --all-targets --all-features -- -D warnings
+      - name: Installer syntax
+        run: sh -n install.sh

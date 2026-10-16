@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Rhine Lab · Terminal Lock</title>
+    <style>
+      /* Painted before the app bundle loads: the lock's first frame is the
+         user's own desktop (rev 3 screenshot), so locking is seamless, and the
+         viewfinder corners give instant feedback while WebGL warms up. */
+      html, body { margin: 0; background: #e7e5e1; overflow: hidden; }
+      #rl-snap { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; z-index: 1000;
+        transform-origin: 0 0; pointer-events: none; will-change: transform, opacity; }
+      #rl-snap img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+      #rl-snap .shade { position: absolute; inset: 0; background: #e7e5e1; opacity: 0; }
+      #rl-snap .scan { position: absolute; left: 0; right: 0; top: 0; height: 2px; background: #b9e432;
+        box-shadow: 0 0 18px 3px rgba(185, 228, 50, 0.55); opacity: 0; }
+      #rl-snap .vf { position: absolute; width: 46px; height: 46px; border: 0 solid #ff7b00;
+        opacity: 0; animation: rl-vf 180ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+      #rl-snap .vf.tl { left: 18px; top: 18px; border-left-width: 3px; border-top-width: 3px; }
+      #rl-snap .vf.tr { right: 18px; top: 18px; border-right-width: 3px; border-top-width: 3px; }
+      #rl-snap .vf.bl { left: 18px; bottom: 18px; border-left-width: 3px; border-bottom-width: 3px; }
+      #rl-snap .vf.br { right: 18px; bottom: 18px; border-right-width: 3px; border-bottom-width: 3px; }
+      @keyframes rl-vf { from { opacity: 0; transform: scale(1.35); } to { opacity: 1; transform: none; } }
+      html.no-snap #rl-snap { display: none; }
+    </style>
+  </head>
+  <body>
+    <div id="rl-snap" aria-hidden="true">
+      <img id="rl-snap-img" alt="" decoding="sync" />
+      <div class="shade"></div>
+      <div class="scan"></div>
+      <i class="vf tl"></i><i class="vf tr"></i><i class="vf bl"></i><i class="vf br"></i>
+    </div>
+    <script>
+      (function () {
+        var q = new URLSearchParams(location.search), img = document.getElementById("rl-snap-img");
+        var out = q.get("output"), dev = q.get("snap");
+        var src = location.protocol === "rhine:" && out ? "rhine://screenshot/" + encodeURIComponent(out) : dev;
+        if (!src) { document.documentElement.classList.add("no-snap"); return; }
+        img.onerror = function () { document.documentElement.classList.add("no-snap"); };
+        img.src = src;
+      })();
+    </script>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,8 @@
+.handoff/
+node_modules/
+frontend/dist/
+backend/target/
+# official BGM is (c) Hypergryph: fetched locally, never committed
+frontend/public/audio/bgm*
+shots/
+tools/assets/build/

@@ -1,0 +1,1 @@
+window.fixtureModuleLoaded = true;

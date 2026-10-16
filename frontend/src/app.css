@@ -1,0 +1,43 @@
+/* Rhine Lab palette — identical to the SDDM theme's Style.qml.
+   --denied (0..1) blends every token into the black/orange WARNING act. */
+@font-face { font-family: "Montserrat"; font-weight: 300; src: url("/fonts/Montserrat-Light.ttf"); }
+@font-face { font-family: "Montserrat"; font-weight: 400; src: url("/fonts/Montserrat-Regular.ttf"); }
+@font-face { font-family: "Montserrat"; font-weight: 500; src: url("/fonts/Montserrat-Medium.ttf"); }
+@font-face { font-family: "Montserrat"; font-weight: 600; src: url("/fonts/Montserrat-SemiBold.ttf"); }
+@font-face { font-family: "Montserrat"; font-weight: 700; src: url("/fonts/Montserrat-Bold.ttf"); }
+@font-face { font-family: "Montserrat"; font-weight: 800; src: url("/fonts/Montserrat-ExtraBold.ttf"); }
+@font-face { font-family: "JetBrains Mono"; font-weight: 400; src: url("/fonts/JetBrainsMono-Regular.ttf"); }
+@font-face { font-family: "JetBrains Mono"; font-weight: 500; src: url("/fonts/JetBrainsMono-Medium.ttf"); }
+@font-face { font-family: "JetBrains Mono"; font-weight: 600; src: url("/fonts/JetBrainsMono-SemiBold.ttf"); }
+@font-face { font-family: "JetBrains Mono"; font-weight: 700; src: url("/fonts/JetBrainsMono-Bold.ttf"); }
+
+:root {
+  --denied: 0;
+  --standby: 0;
+  --orange: #ff7b00;
+  --orange-deep: #e35d00;
+  --lime: #b9e432;
+  --paper: color-mix(in srgb, #e7e5e1, #0b0b0c calc(var(--denied) * 100%));
+  --ink: color-mix(in srgb, #111214, #f2f0eb calc(var(--denied) * 100%));
+  --ink-inverse: color-mix(in srgb, #f2f0eb, #111214 calc(var(--denied) * 100%));
+  --mute: color-mix(in srgb, #8b8882, #6f6d68 calc(var(--denied) * 100%));
+  --faint: color-mix(in srgb, #c9c6c0, #2b2b2d calc(var(--denied) * 100%));
+  --card: color-mix(in srgb, #f6f5f2, #151618 calc(var(--denied) * 100%));
+  --tab: color-mix(in srgb, #e2e0dc, #1d1e20 calc(var(--denied) * 100%));
+  --accent: color-mix(in srgb, var(--lime), var(--orange) calc(var(--denied) * 100%));
+  --display: "Montserrat", "MiSans", "Noto Sans CJK SC", sans-serif;
+  --mono: "JetBrains Mono", "JetBrainsMono Nerd Font", monospace;
+  --cjk: "MiSans", "Source Han Sans CN", "Noto Sans CJK SC", "Noto Sans SC", "PingFang SC", sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body, #app { margin: 0; width: 100%; height: 100%; overflow: hidden; }
+body {
+  background: #e7e5e1;
+  color: var(--ink);
+  font-family: var(--display);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+}

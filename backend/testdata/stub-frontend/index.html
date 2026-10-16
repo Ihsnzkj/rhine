@@ -1,0 +1,20 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Rhine Lock protocol fixture</title>
+<link rel="stylesheet" href="/style.css"><script type="module" src="/module.js"></script>
+<main><h1>RHINE LAB · Protocol fixture</h1><form id="auth"><label for="password">Password</label> <input id="password" type="password" autofocus autocomplete="off"><button id="unlock" type="submit">Unlock</button></form><p role="status" id="status">Starting…</p><pre id="messages"></pre></main>
+<script>
+const send=m=>window.webkit.messageHandlers.rhine.postMessage(m);
+window.fixtureKeyEvents=0;
+addEventListener('keydown',()=>window.fixtureKeyEvents++);
+window.fixtureAudioContext=new AudioContext();
+window.fixtureAudioReports=[];
+const reportAudio=()=>{
+  const report={state:fixtureAudioContext.state,keyEvents:fixtureKeyEvents};
+  fixtureAudioReports.push(report);
+  send({type:'log',level:'info',message:'AudioContext before input: '+JSON.stringify(report)});
+};
+fixtureAudioContext.addEventListener('statechange',reportAudio);
+reportAudio();
+window.__rhine={receive(m){document.querySelector('#messages').textContent+=JSON.stringify(m)+'\n'; if(m.type==='auth'){document.querySelector('#status').textContent=m.state;password.disabled=m.state==='verifying'||m.state==='success';unlock.disabled=password.disabled;if(m.state==='failure'){password.value='';password.focus()}if(m.state==='success'&&!window.NO_UNLOCK_READY)setTimeout(()=>send({type:'unlock-ready'}),300)}}};
+document.querySelector('#auth').onsubmit=e=>{e.preventDefault();send({type:'authenticate',password:password.value});password.value=''};
+send({type:'hello',protocol:1});
+</script></html>
