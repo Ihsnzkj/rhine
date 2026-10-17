@@ -34,6 +34,14 @@ class Lock {
   layout = $state("");
   layouts = $state<string[]>([]);
   media = $state<MediaPlayer | null>(null);
+  /** the first media snapshot has arrived (until then a player may still turn up) */
+  mediaKnown = $state(false);
+  /** the score is installed; the media card offers it when no player is around */
+  scoreAvailable = $state(false);
+  /** the score is fading in or playing */
+  scorePlaying = $state(false);
+  /** the user paused the score with the card (or `music = false` in the config) */
+  scorePaused = false;
   battery = $state<{ percent: number; charging: boolean } | null>(null);
   message = $state("");
   messageIsError = $state(false);
@@ -60,7 +68,6 @@ class Lock {
   private messageTimer = 0;
   private verifyStarted = 0;
   private interacted = false;
-  private mediaKnown = false;
   private musicPending = 0;            // fade (s) of a music start waiting for the media state
   hooks = {
     pulse: (_origin?: number) => {},
@@ -78,6 +85,7 @@ class Lock {
   }
 
   start() {
+    audio.onMusic = (on) => (this.scorePlaying = on);
     const off = onMessage((m) => {
       switch (m.type) {
         case "init": return this.onInit(m);
@@ -110,11 +118,16 @@ class Lock {
   }
 
   private onInit(i: Init) {
+    const first = !this.init;
     this.init = i;
     const c = i.config ?? {};
     if (typeof c.standby_seconds === "number" && Number.isFinite(c.standby_seconds) && c.standby_seconds >= 0)
       standbyAfter = Math.min(c.standby_seconds * 1000, 2_000_000_000);   // 0 = never; setTimeout caps at 2^31-1
-    audio.init({ sfx: c.sfx_volume, music: c.music_volume, musicEnabled: c.music !== false });
+    // `music = false` only starts the score paused: the media card can still
+    // play it, and that choice survives a later init
+    if (first) this.scorePaused = c.music === false;
+    audio.init({ sfx: c.sfx_volume, music: c.music_volume, musicEnabled: !this.scorePaused });
+    if (first) void audio.hasScore.then((ok) => (this.scoreAvailable = ok));
     // one voice per machine: secondary monitors stay silent, whatever F4 says
     audio.setMuted(this.muted || !i.output.primary);
     // Initial capabilities can arrive before the first MPRIS poll. Only an
@@ -340,6 +353,22 @@ class Lock {
 
   mediaAction(action: "play-pause" | "next" | "previous") {
     send({ type: "media", action });
+    audio.play("nav");
+  }
+
+  /** the media card's play/pause while it shows the score.  The card's
+   *  pointerdown does not reach the window, so the activity that may fade
+   *  the score in happens here, after the press has been read as the card
+   *  showed it: a first press on ▶ plays rather than pausing what it began. */
+  toggleScore() {
+    const play = !this.scorePlaying;
+    this.scorePaused = !play;
+    audio.musicEnabled = play;
+    if (play && this.muted) this.toggleMute();   // ▶ means: let me hear it
+    this.activity();
+    if (play) this.startMusic(1.2);
+    else audio.music(false, 0.8);
+    this.addLog(play ? "SCORE · PLAYING" : "SCORE · PAUSED");
     audio.play("nav");
   }
 

@@ -29,6 +29,8 @@ const CUES: Record<string, { files: string[]; gain: number }> = {
 
 // 32 bars of "Rhine Lab.LLC" at 112 BPM, exactly as cut by tools/fetch-bgm.py
 const BGM_LOOP_SECONDS = (102857 * 32) / 48000;
+/** that loop as the media card shows it when no player of the user's is around */
+export const SCORE = { name: "Local score", title: "Rhine Lab.LLC", artist: "塞壬唱片-MSR", album: "孤星OST" };
 
 // perceptual 0..1 → amplitude over a 42 dB range (same curve as the greeter)
 const amp = (v: number) => (v <= 0.001 ? 0 : Math.pow(10, ((v - 1) * 42) / 20));
@@ -51,6 +53,10 @@ class Audio {
   musicEnabled = true;
   private musicTarget = 0;
   private duckLevel = 1;
+  /** told whenever the score is set to fade in (true) or out (false) */
+  onMusic: (on: boolean) => void = () => {};
+  /** whether the score is installed (tools/fetch-bgm.py); false without audio */
+  hasScore: Promise<boolean> = Promise.resolve(false);
 
   /** apply (validated) settings; creates the AudioContext the first time */
   init(cfg: { sfx?: unknown; music?: unknown; musicEnabled?: boolean }) {
@@ -60,7 +66,7 @@ class Audio {
     if (this.ctx) {
       // a later init (page reload, output change) re-applies the settings
       this.sfxBus.gain.value = this.muted ? 0 : amp(this.sfxVolume);
-      if (!this.musicEnabled) this.musicTarget = 0;
+      if (!this.musicEnabled) this.setTarget(0);
       this.ramp(0.4);
       return;
     }
@@ -76,6 +82,8 @@ class Audio {
     this.musicBus.gain.value = 0;
     this.musicBus.connect(this.ctx.destination);
     this.loading = this.load();
+    // the media card offers the score only when it is there; HEAD decodes nothing
+    this.hasScore = fetch("./audio/bgm-loop.opus", { method: "HEAD" }).then((r) => r.ok, () => false);
   }
 
   private async load() {
@@ -141,9 +149,14 @@ class Audio {
    *  WebKitGTK (MEDIA_ERR_SRC_NOT_SUPPORTED), fetch + decodeAudioData can. */
   music(on: boolean, seconds = 2.4) {
     if (!this.ctx) return;
-    this.musicTarget = on && this.musicEnabled && !this.muted ? 1 : 0;
+    this.setTarget(on && this.musicEnabled && !this.muted ? 1 : 0);
     if (this.musicTarget && !this.bgm && !this.bgmLoading) void this.startLoop();
     this.ramp(seconds);
+  }
+
+  private setTarget(t: number) {
+    this.musicTarget = t;
+    this.onMusic(t > 0);
   }
 
   private async startLoop() {

@@ -1,14 +1,25 @@
 <script lang="ts">
   import { lock } from "../lock.svelte";
+  import { SCORE } from "../audio";
   import Logo from "./Logo.svelte";
   // AUDIO FEED: the active MPRIS player as a Rhine Lab specimen card.
   // proxies like playerctld are always on the bus; only show a real track
-  const m = $derived(lock.media && (lock.media.title || lock.media.playing) ? lock.media : null);
+  const player = $derived(lock.media && (lock.media.title || lock.media.playing) ? lock.media : null);
+  // With no player around, the lock's own score — on the primary output
+  // only, the one that plays it — once the first media snapshot is in.
+  const score = $derived(!player && lock.mediaKnown && lock.scoreAvailable && lock.primary);
+  const m = $derived(player ?? (score
+    ? { ...SCORE, playing: lock.scorePlaying, artUrl: null, canNext: false, canPrevious: false, canPlayPause: true }
+    : null));
   let artOk = $state(false);
+  function playPause() {
+    if (score) lock.toggleScore();
+    else lock.mediaAction("play-pause");
+  }
 </script>
 
 {#if m}
-<div class="feed" class:playing={m.playing}>
+<div class="feed" class:playing={m.playing} class:score>
   <div class="head"><span>AUDIO FEED</span><em>{m.name.toUpperCase()}</em><i class="live"></i></div>
   <div class="body">
     <div class="art">
@@ -21,7 +32,8 @@
       <div class="ctl">
         <button disabled={!m.canPrevious} onclick={() => lock.mediaAction("previous")} aria-label="previous">
           <svg viewBox="0 0 12 10" width="12" height="10"><rect x="0" y="0" width="2" height="10" /><path d="M12 0 L3 5 L12 10 Z" /></svg></button>
-        <button class="pp" disabled={!m.canPlayPause} onclick={() => lock.mediaAction("play-pause")} aria-label="play or pause">
+        <button class="pp" disabled={!m.canPlayPause} onclick={playPause}
+                onpointerdown={(e) => { if (score) e.stopPropagation(); }} aria-label="play or pause">
           {#if m.playing}<svg viewBox="0 0 10 10" width="10" height="10"><rect x="0" y="0" width="3.5" height="10" /><rect x="6.5" y="0" width="3.5" height="10" /></svg>
           {:else}<svg viewBox="0 0 10 10" width="10" height="10"><path d="M0 0 L10 5 L0 10 Z" /></svg>{/if}</button>
         <button disabled={!m.canNext} onclick={() => lock.mediaAction("next")} aria-label="next">

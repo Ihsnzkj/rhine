@@ -270,7 +270,7 @@ allow_power = true
 
 [frontend]            # passed through untouched as init.config
 quality = "ultra"     # ultra | high | low; anything else → ultra
-music = true
+music = true          # false: the score starts paused
 music_volume = 0.68   # 0..1, clamped; non-numbers ignored
 sfx_volume = 0.7      # 0..1, clamped
 standby_seconds = 45  # 0 = never

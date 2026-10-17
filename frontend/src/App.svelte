@@ -233,6 +233,17 @@
   function isControl(t: EventTarget | null): t is HTMLElement {
     return t instanceof HTMLElement && t !== input && t.matches("button, a[href], [tabindex]");
   }
+  /** Tab past either end wraps within the page: leaving it would hand focus
+   *  to the GTK window, from where the key field takes it back, and the
+   *  controls before the field (the media card) could never be reached */
+  function wrapFocus(e: KeyboardEvent) {
+    const all = [...document.querySelectorAll<HTMLElement>("input, button:not(:disabled), a[href], [tabindex]:not([tabindex='-1'])")]
+      .filter((el) => el.getClientRects().length > 0);
+    const i = all.indexOf(document.activeElement as HTMLElement);
+    if (!all.length || (e.shiftKey ? i > 0 : i >= 0 && i < all.length - 1)) return;
+    e.preventDefault();
+    all[e.shiftKey ? all.length - 1 : 0].focus();
+  }
   function onKey(e: KeyboardEvent) {
     // A held key repeats its keydown; only a fresh press may act: a held F9
     // must never confirm its own power-off, a held Enter never re-submit, and
@@ -263,12 +274,15 @@
     if (e.isComposing || e.keyCode === 229) return;
     // keyboard navigation: Tab walks the controls, Enter/Space press the
     // focused one, Esc returns to the key field; typing always goes there
-    if (e.key === "Tab") return;
+    if (e.key === "Tab") { wrapFocus(e); return; }
     if (isControl(e.target)) {
       if (e.key === "Enter" || e.key === " ") return;
       // Escape still cancels power/clears the key after returning focus.
     }
-    if (document.activeElement !== input) input?.focus();
+    // typing, Backspace/Delete and Escape go to the key field; a modifier or
+    // F-key pressed on a control leaves focus there (Shift of Shift+Tab, F4)
+    const edits = e.key.length === 1 || e.key === "Backspace" || e.key === "Delete" || e.key === "Escape";
+    if (document.activeElement !== input && (edits || !isControl(e.target))) input?.focus();
     switch (e.key) {
       case "Enter": e.preventDefault(); lock.submit(); return;
       case "Escape": e.preventDefault(); if (lock.armed) lock.disarm(); else if (lock.phase === "ready") { lock.clearPassword(); if (input) input.value = ""; } return;

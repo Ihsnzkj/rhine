@@ -50,7 +50,8 @@ sway, Hyprland, river and others — and authenticates through PAM.
 - **Careful with the key.** Keys longer than 4096 bytes are refused, never
   truncated; an empty key is never sent (it could only count against
   `pam_faillock`); core dumps are off and the backend wipes its copies.
-- **Media and power.** Shows the playing MPRIS track with controls; suspend,
+- **Media and power.** Shows the playing MPRIS track with controls — with
+  no player around, the lock's own score, with play/pause; suspend,
   reboot and power-off appear only when logind allows them without a polkit
   prompt, and need a second, separate press.
 - **Sound.** Interface sounds are included; the score is optional and
@@ -152,7 +153,7 @@ allow_power = true           # offer reboot / power off
 
 [frontend]
 quality = "ultra"            # ultra | high | low (low: no shadows, AO or depth of field)
-music = true
+music = true                 # false: the score starts paused (the media card can play it)
 music_volume = 0.68          # perceptual, 0–1
 sfx_volume = 0.7             # 0–1
 standby_seconds = 45         # dim into standby after this idle time, 0 = never

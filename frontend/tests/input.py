@@ -3,7 +3,7 @@
 """Input-path regressions of the real frontend (frontend/dist) in the real
 GTK/WebKit lock: mock-auth backend, private headless compositor, real keys
 through wtype.  Run with frontend/tests/input.sh."""
-import os, pathlib, subprocess, sys, time
+import os, pathlib, shutil, subprocess, sys, time
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "backend/tests"))
@@ -220,6 +220,106 @@ def main():
         c.exited()
     finally:
         c.cleanup()
+
+    # With no player around, the media card offers the lock's own score.  The
+    # score is not in the repository: a stand-in file tests its presence and
+    # the card's state, not the music.
+    with_score, without_score = h.ART / "frontend-score", h.ART / "frontend-no-score"
+    for d in (with_score, without_score):
+        shutil.rmtree(d, ignore_errors=True)
+        shutil.copytree(DIST, d, ignore=shutil.ignore_patterns("bgm*"))
+    (with_score / "audio/bgm-loop.opus").write_bytes(b"OggS" + bytes(4096))
+    card = ("(()=>{const f=document.querySelector('.feed');return f&&{score:f.classList.contains('score'),"
+            "title:f.querySelector('b').textContent,name:f.querySelector('em').textContent,"
+            "playing:f.classList.contains('playing')}})()")
+    press = "{const b=document.querySelector('.feed button.pp');b.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));b.click();}true"
+    score = {"score": True, "title": "Rhine Lab.LLC", "name": "LOCAL SCORE"}
+
+    config('[lock]\nallow_power=false\n[frontend]\nquality="low"\nstandby_seconds=0\n')
+    d = h.start("input-score", frontend=with_score)
+    try:
+        d.ready()
+        settled(d)
+        h.wait_for(lambda: d.js("__lock.mediaKnown && __lock.scoreAvailable"), "media snapshot and score probe")
+        st = d.js(card)
+        check("with no player, the card offers the score (silent until someone is back)", st == {**score, "playing": False}, st)
+        d.js(press)
+        st = d.js("({playing:__lock.scorePlaying,paused:__lock.scorePaused})")
+        check("a first press on play starts the score instead of pausing it", st == {"playing": True, "paused": False}, st)
+        found = None
+        for _ in range(12):
+            wtype("-k", "Tab"); time.sleep(0.15)
+            if d.js("document.activeElement.getAttribute('aria-label')") == "play or pause":
+                found = True
+                break
+        wtype("-k", "space"); time.sleep(0.25)
+        check("Space on the focused card button pauses the score",
+              found and not d.js("__lock.scorePlaying") and d.js("__lock.log.some(l=>l.text==='SCORE · PAUSED')"))
+        d.js("{__lock.activity();}true")
+        check("a paused score stays paused on activity", not d.js("__lock.scorePlaying"))
+        wtype("-k", "space"); time.sleep(0.25)
+        st = d.js("({focus:document.activeElement.getAttribute('aria-label')||document.activeElement.type,"
+                  "len:__lock.passwordLength,playing:__lock.scorePlaying,log:__lock.log.slice(-3).map(l=>l.text)})")
+        check("a second Space plays it again", st["playing"], st)
+        focus = "document.activeElement.getAttribute('aria-label')"
+        wtype("-M", "shift", "-k", "Tab", "-m", "shift"); time.sleep(0.2)
+        back = d.js(focus)
+        wtype("-k", "Tab"); time.sleep(0.2)
+        check("Shift+Tab and Tab wrap around the controls without leaving the page",
+              back == "toggle audio" and d.js(focus) == "play or pause", f"{back} → {d.js(focus)}")
+        wtype("-k", "F4"); time.sleep(0.25)
+        st = d.js(card)
+        check("F4 silences the score and the card shows it paused", d.js("__lock.muted") and st["playing"] is False, st)
+        d.js(press)
+        check("play while muted brings the sound back", d.js("!__lock.muted && __lock.scorePlaying"))
+        time.sleep(0.4)
+        h.shot("input-score-card")
+        d.js('''{__rhine.receive({type:"media",player:{name:"Fixture",title:"External",artist:"",album:"",playing:true,
+            artUrl:null,canNext:true,canPrevious:true,canPlayPause:true}});}true''')
+        st = d.js(card)
+        check("a player of the user's replaces the score and silences it",
+              st["title"] == "External" and not st["score"] and not d.js("__lock.scorePlaying"), st)
+        d.js('{__rhine.receive({type:"media",player:null});}true')
+        st = d.js(card)
+        check("the score returns when the player leaves", st is not None and st["score"], st)
+        d.js("{__rhine.receive({...__lock.init,output:{...__lock.init.output,primary:false}});}true")
+        check("a secondary output, always silent, offers no score", d.js(card) is None)
+        d.js("{__rhine.receive({...__lock.init,output:{...__lock.init.output,primary:true}});}true")
+        d.password("rhine-test")
+        d.exited()
+    finally:
+        d.cleanup()
+
+    config('[lock]\nallow_power=false\n[frontend]\nquality="low"\nmusic=false\nstandby_seconds=0\n')
+    e = h.start("input-score-off", frontend=with_score)
+    try:
+        e.ready()
+        settled(e)
+        h.wait_for(lambda: e.js("__lock.mediaKnown && __lock.scoreAvailable"), "media snapshot and score probe")
+        e.js("{__lock.activity();}true")
+        st = e.js(card)
+        check("music = false starts the score paused, and activity leaves it", st == {**score, "playing": False}, st)
+        e.js(press)
+        check("play starts a score the config paused", e.js("__lock.scorePlaying"))
+        e.password("rhine-test")
+        e.exited()
+    finally:
+        e.cleanup()
+
+    config('[lock]\nallow_power=false\n[frontend]\nquality="low"\nstandby_seconds=0\n')
+    f = h.start("input-no-score", frontend=without_score)
+    try:
+        f.ready()
+        settled(f)
+        h.wait_for(lambda: f.js("__lock.mediaKnown"), "media snapshot")
+        f.js("{fetch('./audio/bgm-loop.opus',{method:'HEAD'}).then(r=>window.head=r.status);}true")
+        h.wait_for(lambda: f.js("window.head") is not None, "HEAD answer")
+        check("without the score file the card stays hidden",
+              f.js("window.head") == 404 and not f.js("__lock.scoreAvailable") and f.js(card) is None)
+        f.password("rhine-test")
+        f.exited()
+    finally:
+        f.cleanup()
 
     bad = [n for n, ok in results if not ok]
     print(f"\n{len(results) - len(bad)}/{len(results)} passed" + (": FAILED " + "; ".join(bad) if bad else ""), flush=True)
